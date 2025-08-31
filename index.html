@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>click zone</title>
+<style>
+body{margin:0;font-family:sans-serif;background:#222;color:white;display:flex;flex-direction:column;align-items:center}
+canvas{background:#111;display:block;margin-top:20px}
+button{margin:5px;padding:10px 20px;font-size:16px;cursor:pointer}
+#menu,#topGlobal,#topSemanal{margin-top:20px}
+#topGlobal,#topSemanal{display:none}
+</style>
+</head>
+<body>
+<div id="menu">
+  <button id="btnJogar">Jogar</button>
+  <button id="btnTopGlobal">Top Global</button>
+  <button id="btnTopSemanal">Top Semanal</button>
+</div>
+<div id="topGlobal"></div>
+<div id="topSemanal"></div>
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
+
+const firebaseConfig={
+apiKey:"AIzaSyC9id2pXKJsk-5LVH-o3L4ejWXHwKY0mAE",
+authDomain:"pontos-d5477.firebaseapp.com",
+projectId:"pontos-d5477",
+storageBucket:"pontos-d5477.firebasestorage.app",
+messagingSenderId:"514785770371",
+appId:"1:514785770371:web:c5cba2f049f7bb6e9bd4b6",
+measurementId:"G-YGXCY3JVQF"
+};
+const app=initializeApp(firebaseConfig);
+const analytics=getAnalytics(app);
+const database=getDatabase(app);
+
+function criarOuAtualizarPlayer(nick,pontos){
+  const playerRefGlobal=ref(database,'playersGlobal/'+nick);
+  const playerRefSemanal=ref(database,'playersSemanal/'+nick);
+  get(playerRefGlobal).then(snap=>{
+    if(snap.exists()){
+      if(pontos>snap.val().score)set(playerRefGlobal,{score:pontos,lastUpdate:new Date().toISOString()});
+    }else set(playerRefGlobal,{score:pontos,lastUpdate:new Date().toISOString()});
+  });
+  get(playerRefSemanal).then(snap=>{
+    if(snap.exists()){
+      if(pontos>snap.val().score)set(playerRefSemanal,{score:pontos,lastUpdate:new Date().toISOString()});
+    }else set(playerRefSemanal,{score:pontos,lastUpdate:new Date().toISOString()});
+  });
+}
+
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+let quadrado={x:280,y:180,w:40,h:40};
+let bola=null;
+let pontos=0;
+let nickDoJogador="";
+const velocidadeBola=3;
+
+const menu=document.getElementById('menu');
+const topGlobalDiv=document.getElementById('topGlobal');
+const topSemanalDiv=document.getElementById('topSemanal');
+
+function pedirNick(){
+  let nick=localStorage.getItem('nickJogador');
+  if(!nick){
+    nick=prompt("Digite seu Nick:");
+    if(!nick)nick="Jogador"+Math.floor(Math.random()*1000);
+    localStorage.setItem('nickJogador',nick);
+  }
+  nickDoJogador=nick;
+}
+
+function criarNovaBola(){
+  const direcoes=["esq-dir","dir-esq","cima-baixo","baixo-cima"];
+  const dir=direcoes[Math.floor(Math.random()*direcoes.length)];
+  let x=0,y=0,dx=0,dy=0;
+  switch(dir){
+    case "esq-dir": x=0;y=quadrado.y+quadrado.h/2-10;dx=velocidadeBola;dy=0;break;
+    case "dir-esq": x=canvas.width-20;y=quadrado.y+quadrado.h/2-10;dx=-velocidadeBola;dy=0;break;
+    case "cima-baixo": x=quadrado.x+quadrado.w/2-10;y=0;dx=0;dy=velocidadeBola;break;
+    case "baixo-cima": x=quadrado.x+quadrado.w/2-10;y=canvas.height-20;dx=0;dy=-velocidadeBola;break;
+  }
+  bola={x,y,w:20,h:20,dx,dy,ativa:true};
+}
+
+function desenhar(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="green";ctx.fillRect(quadrado.x,quadrado.y,quadrado.w,quadrado.h);
+  if(bola&&bola.ativa){ctx.fillStyle="red";ctx.fillRect(bola.x,bola.y,bola.w,bola.h);}
+  ctx.fillStyle="white";ctx.font="20px sans-serif";ctx.fillText("Pontos: "+pontos,10,30);
+}
+
+function atualizar(){
+  if(bola&&bola.ativa){
+    bola.x+=bola.dx;
+    bola.y+=bola.dy;
+    if(bola.x>canvas.width||bola.x+bola.w<0||bola.y>canvas.height||bola.y+bola.h<0){
+      bola.ativa=false;
+      criarOuAtualizarPlayer(nickDoJogador,pontos);
+      location.reload(); // reinicia o site se errar
+      return;
+    }
+  }
+  desenhar();
+  requestAnimationFrame(atualizar);
+}
+
+function iniciarJogo(){
+  pontos=0;
+  menu.style.display="none";topGlobalDiv.style.display="none";topSemanalDiv.style.display="none";
+  criarNovaBola();
+  requestAnimationFrame(atualizar);
+}
+
+canvas.addEventListener('click',()=>{
+  if(!bola||!bola.ativa)return;
+  if(bola.x+bola.w/2>quadrado.x && bola.x+bola.w/2<quadrado.x+quadrado.w &&
+     bola.y+bola.h/2>quadrado.y && bola.y+bola.h/2<quadrado.y+quadrado.h){
+    pontos++;
+    criarOuAtualizarPlayer(nickDoJogador,pontos);
+    bola.ativa=false;
+    criarNovaBola();
+  }else{
+    criarOuAtualizarPlayer(nickDoJogador,pontos);
+    location.reload(); // reinicia o site se errar
+  }
+});
+
+async function mostrarTopGlobal(){
+  topGlobalDiv.innerHTML="Top Global:<br>";topGlobalDiv.style.display="block";
+  const snapshot=await get(ref(database,'playersGlobal'));
+  if(snapshot.exists()){
+    const lista=Object.entries(snapshot.val()).sort((a,b)=>b[1].score-a[1].score).slice(0,5);
+    lista.forEach(([nick,data],i)=>{topGlobalDiv.innerHTML+=`${i+1}. ${nick}: ${data.score}<br>`;});
+  }
+}
+
+async function mostrarTopSemanal(){
+  topSemanalDiv.innerHTML="Top Semanal:<br>";topSemanalDiv.style.display="block";
+  const snapshot=await get(ref(database,'playersSemanal'));
+  if(snapshot.exists()){
+    const lista=Object.entries(snapshot.val()).sort((a,b)=>b[1].score-a[1].score).slice(0,7);
+    lista.forEach(([nick,data],i)=>{topSemanalDiv.innerHTML+=`${i+1}. ${nick}: ${data.score}<br>`;});
+  }
+}
+
+function resetSemanal(){const hoje=new Date();if(hoje.getDay()===1)set(ref(database,'playersSemanal'),{});}
+
+document.getElementById('btnJogar').addEventListener('click',iniciarJogo);
+document.getElementById('btnTopGlobal').addEventListener('click',mostrarTopGlobal);
+document.getElementById('btnTopSemanal').addEventListener('click',mostrarTopSemanal);
+
+pedirNick();resetSemanal();
+</script>
+</body>
+</html>
