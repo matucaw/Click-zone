@@ -1,16 +1,16 @@
-self.addEventListener('install', (event) => {
-  self.skipWaiting(); // força ativação imediata
-  console.log('Service Worker instalado e pronto para atualização!');
+self.addEventListener("install", (event) => {
+  // ativa imediatamente a nova versão
+  self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim()); // toma controle das abas abertas
+self.addEventListener("activate", (event) => {
+  // força os clientes (abas/instalações) a usarem a nova versão
+  event.waitUntil(clients.claim());
 });
 
-// Intercepta todas as requisições
-self.addEventListener('fetch', (event) => {
+self.addEventListener("fetch", (event) => {
+  // sempre busca do servidor primeiro
   event.respondWith(
-    fetch(event.request) // sempre busca do servidor
-      .catch(() => caches.match(event.request)) // fallback se offline
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
